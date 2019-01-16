@@ -64,7 +64,7 @@ public class KafkaMessage implements com.linkedin.camus.coders.Message {
         if (key == null){
             readMessage = new Message(payload);
         } else {
-            readMessage = new Message(payload, key);
+            readMessage = new Message(payload, key, Message.NoTimestamp(), Message.CurrentMagicValue());
         }
 
         if (checksum != readMessage.checksum()) {
