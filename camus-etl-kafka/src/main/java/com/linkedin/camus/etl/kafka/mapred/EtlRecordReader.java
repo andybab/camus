@@ -6,7 +6,7 @@ import com.linkedin.camus.coders.MessageDecoder;
 import com.linkedin.camus.etl.kafka.CamusJob;
 import com.linkedin.camus.etl.kafka.coders.MessageDecoderFactory;
 import com.linkedin.camus.etl.kafka.common.EtlKey;
-import com.linkedin.camus.etl.kafka.common.EtlRequest;
+import com.linkedin.camus.etl.kafka.common.EtlRequestKafkaConsumer;
 import com.linkedin.camus.etl.kafka.common.ExceptionWritable;
 import com.linkedin.camus.etl.kafka.common.KafkaReader;
 import com.linkedin.camus.schemaregistry.SchemaNotFoundException;
@@ -42,7 +42,7 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
 
   protected TaskAttemptContext context;
 
-  private EtlInputFormat inputFormat;
+  private EtlInputFormatKafkaConsumer inputFormat;
   private Mapper<EtlKey, Writable, EtlKey, Writable>.Context mapperContext;
   private KafkaReader reader;
 
@@ -79,7 +79,7 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
    * @throws IOException
    * @throws InterruptedException
    */
-  public EtlRecordReader(EtlInputFormat inputFormat, InputSplit split, TaskAttemptContext context) throws IOException,
+  public EtlRecordReader(EtlInputFormatKafkaConsumer inputFormat, InputSplit split, TaskAttemptContext context) throws IOException,
       InterruptedException {
     this.inputFormat = inputFormat;
     initialize(split, context);
@@ -241,7 +241,7 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
                 / this.numRecordsReadForCurrentPartition);
           }
 
-          EtlRequest request = (EtlRequest) split.popRequest();
+          EtlRequestKafkaConsumer request = (EtlRequestKafkaConsumer) split.popRequest();
           if (request == null) {
             return false;
           }
