@@ -15,148 +15,147 @@ import java.util.Iterator;
 import java.util.Properties;
 
 public class KafkaReaderKafkaConsumer extends KafkaReader {
-    private static Logger log = Logger.getLogger(KafkaReaderKafkaConsumer.class);
-    private KafkaConsumer<byte[], byte[]> kafkaConsumer = null;
-    private Iterator<ConsumerRecord<byte[],byte[]>> messageIter = null;
-    private EtlRequest kafkaRequest = null;
-    private TopicPartition topicPartition = null;
+  private static Logger log = Logger.getLogger(KafkaReaderKafkaConsumer.class);
+  private KafkaConsumer<byte[], byte[]> kafkaConsumer = null;
+  private Iterator<ConsumerRecord<byte[],byte[]>> messageIter = null;
+  private EtlRequest kafkaRequest = null;
+  private TopicPartition topicPartition = null;
 
-    private long beginOffset;
-    private long currentOffset;
-    private long lastOffset;
-    private long currentCount;
-    private long lastFetchTime = 0;
+  private long beginOffset;
+  private long currentOffset;
+  private long lastOffset;
+  private long currentCount;
+  private long lastFetchTime = 0;
 
-    private TaskAttemptContext context;
+  private TaskAttemptContext context;
 
-    private long totalFetchTime = 0;
+  private long totalFetchTime = 0;
 
-    /**
-     * Construct using the json representation of the kafka request
-     *
-     * @param inputFormat
-     * @param context
-     * @param request
-     * @param clientTimeout
-     * @param fetchBufferSize
-     */
-    public KafkaReaderKafkaConsumer(EtlInputFormat inputFormat, TaskAttemptContext context, EtlRequest request, int clientTimeout, int fetchBufferSize) throws Exception {
-        super(inputFormat, context, request, clientTimeout, fetchBufferSize);
+  /**
+   * Construct using the json representation of the kafka request
+   *
+   * @param inputFormat
+   * @param context
+   * @param request
+   * @param clientTimeout
+   * @param fetchBufferSize
+   */
+  public KafkaReaderKafkaConsumer(EtlInputFormat inputFormat, TaskAttemptContext context, EtlRequest request, int clientTimeout, int fetchBufferSize) throws Exception {
+    super(inputFormat, context, request, clientTimeout, fetchBufferSize);
 
-        Properties props = new Properties();
-        props.put("bootstrap.servers", CamusJob.getKafkaBrokers(context));
-        props.put("group.id", CamusJob.getKafkaClientName(context));
-        props.put("enable.auto.commit", "false");
-        props.put("auto.commit.interval.ms", "1000");
-        props.put("session.timeout.ms", "30000");
-        props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-        props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    Properties props = new Properties();
+    props.put("bootstrap.servers", CamusJob.getKafkaBrokers(context));
+    props.put("group.id", CamusJob.getKafkaClientName(context));
+    props.put("enable.auto.commit", "false");
+    props.put("session.timeout.ms", "30000");
+    props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
 
-        this.context = context;
-        this.kafkaRequest = request;
-        this.beginOffset = request.getOffset();
-        this.currentOffset = request.getOffset();
-        this.lastOffset = request.getLastOffset();
-        this.currentCount = 0;
-        this.totalFetchTime = 0;
+    this.context = context;
+    this.kafkaRequest = request;
+    this.beginOffset = request.getOffset();
+    this.currentOffset = request.getOffset();
+    this.lastOffset = request.getLastOffset();
+    this.currentCount = 0;
+    this.totalFetchTime = 0;
 
-        String topic = "foo";
-        this.topicPartition = new TopicPartition(this.kafkaRequest.getTopic(), this.kafkaRequest.getPartition());
-        //consumer.assign(Arrays.asList(topicPartition, partition1));
+    String topic = "foo";
+    this.topicPartition = new TopicPartition(this.kafkaRequest.getTopic(), this.kafkaRequest.getPartition());
+    //consumer.assign(Arrays.asList(topicPartition, partition1));
 
 
-        this.kafkaConsumer = new KafkaConsumer<byte[], byte[]>(props);
-        this.kafkaConsumer.assign(Arrays.asList(topicPartition));
-        log.info("Beginning reading at offset " + beginOffset + " latest offset=" + lastOffset);
-        this.fetch();
+    this.kafkaConsumer = new KafkaConsumer<byte[], byte[]>(props);
+    this.kafkaConsumer.assign(Arrays.asList(topicPartition));
+    log.info("Beginning reading at offset " + beginOffset + " latest offset=" + lastOffset);
+    this.fetch();
+  }
+
+  @Override
+  public boolean hasNext() throws IOException {
+    if (currentOffset >= lastOffset) {
+      return false;
+    }
+    if (messageIter != null && messageIter.hasNext()) {
+      return true;
+    } else {
+      return fetch();
+    }
+  }
+
+  @Override
+  public KafkaMessage getNext(EtlKey etlKey) throws IOException {
+    if(!hasNext()) {
+      return null;
     }
 
-    @Override
-    public boolean hasNext() throws IOException {
-        if (currentOffset >= lastOffset) {
-            return false;
-        }
-        if (messageIter != null && messageIter.hasNext()) {
-            return true;
-        } else {
-            return fetch();
-        }
+    ConsumerRecord<byte[], byte[]> consumerRecord = messageIter.next();
+
+    byte[] payload = consumerRecord.value();
+    byte[] key     = consumerRecord.key();
+
+    if (payload == null) {
+      log.warn("Received message with null message.payload(): " + consumerRecord);
     }
 
-    @Override
-    public KafkaMessage getNext(EtlKey etlKey) throws IOException {
-        if(!hasNext()) {
-            return null;
-        }
+    etlKey.clear();
+    etlKey.set(kafkaRequest.getTopic(), kafkaRequest.getLeaderId(), kafkaRequest.getPartition(), currentOffset,
+            consumerRecord.offset() + 1, consumerRecord.checksum());
 
-        ConsumerRecord<byte[], byte[]> consumerRecord = messageIter.next();
+    etlKey.setMessageSize(consumerRecord.serializedKeySize() + consumerRecord.serializedValueSize());
+    currentOffset = consumerRecord.offset() + 1; // increase offset
+    currentCount++; // increase count
 
-        byte[] payload = consumerRecord.value();
-        byte[] key     = consumerRecord.key();
+    return new KafkaMessage(payload, key, kafkaRequest.getTopic(), kafkaRequest.getPartition(),
+            consumerRecord.offset(), consumerRecord.checksum());
+  }
 
-        if (payload == null) {
-            log.warn("Received message with null message.payload(): " + consumerRecord);
-        }
-
-        etlKey.clear();
-        etlKey.set(kafkaRequest.getTopic(), kafkaRequest.getLeaderId(), kafkaRequest.getPartition(), currentOffset,
-                consumerRecord.offset() + 1, consumerRecord.checksum());
-
-        etlKey.setMessageSize(consumerRecord.serializedKeySize() + consumerRecord.serializedValueSize());
-        currentOffset = consumerRecord.offset() + 1; // increase offset
-        currentCount++; // increase count
-
-        return new KafkaMessage(payload, key, kafkaRequest.getTopic(), kafkaRequest.getPartition(),
-                consumerRecord.offset(), consumerRecord.checksum());
+  @Override
+  public boolean fetch() throws IOException {
+    if (currentOffset >= lastOffset) {
+      return false;
     }
+    long tempTime = System.currentTimeMillis();
+    this.kafkaConsumer.seek(this.topicPartition, currentOffset);
+    ConsumerRecords<byte[], byte[]> result = this.kafkaConsumer.poll(CamusJob.getKafkaFetchRequestMaxWait(context));
 
-    @Override
-    public boolean fetch() throws IOException {
-        if (currentOffset >= lastOffset) {
-            return false;
-        }
-        long tempTime = System.currentTimeMillis();
-        this.kafkaConsumer.seek(this.topicPartition, currentOffset);
-        ConsumerRecords<byte[], byte[]> result = this.kafkaConsumer.poll(CamusJob.getKafkaFetchRequestMaxWait(context));
+    lastFetchTime = (System.currentTimeMillis() - tempTime);
+    log.debug("Time taken to fetch : " + (lastFetchTime / 1000) + " seconds");
+    totalFetchTime += lastFetchTime;
 
-        lastFetchTime = (System.currentTimeMillis() - tempTime);
-        log.debug("Time taken to fetch : " + (lastFetchTime / 1000) + " seconds");
-        totalFetchTime += lastFetchTime;
+    this.messageIter = result.iterator();
 
-        this.messageIter = result.iterator();
+    return this.messageIter.hasNext();
+  }
 
-        return this.messageIter.hasNext();
+  @Override
+  public void close() throws IOException {
+    if(this.kafkaConsumer != null) {
+      this.kafkaConsumer.close();
     }
+  }
 
-    @Override
-    public void close() throws IOException {
-        if(this.kafkaConsumer != null) {
-            this.kafkaConsumer.close();
-        }
-    }
+  @Override
+  public long getTotalBytes()  {
+    return (lastOffset > beginOffset) ? lastOffset - beginOffset : 0;
+  }
 
-    @Override
-    public long getTotalBytes()  {
-        return (lastOffset > beginOffset) ? lastOffset - beginOffset : 0;
-    }
+  @Override
+  public long getReadBytes()  {
+    return currentOffset - beginOffset;
+  }
 
-    @Override
-    public long getReadBytes()  {
-        return currentOffset - beginOffset;
-    }
+  @Override
+  public long getCount() {
+    return this.currentCount;
+  }
 
-    @Override
-    public long getCount() {
-        return this.currentCount;
-    }
+  @Override
+  public long getFetchTime()  {
+    return lastFetchTime;
+  }
 
-    @Override
-    public long getFetchTime()  {
-        return lastFetchTime;
-    }
-
-    @Override
-    public long getTotalFetchTime() {
-        return totalFetchTime;
-    }
+  @Override
+  public long getTotalFetchTime() {
+    return totalFetchTime;
+  }
 }
