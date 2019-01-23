@@ -12,6 +12,7 @@ import com.linkedin.camus.etl.kafka.common.EtlRequestKafkaConsumer;
 import com.linkedin.camus.etl.kafka.common.LeaderInfo;
 import com.linkedin.camus.workallocater.CamusRequest;
 import com.linkedin.camus.workallocater.WorkAllocator;
+import kafka.admin.AdminClient;
 import kafka.api.PartitionMetadata;
 import kafka.api.PartitionOffsetRequestInfo;
 import kafka.api.TopicMetadata;
@@ -91,6 +92,12 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
     return new EtlRecordReader(this, split, context);
   }
 
+  private Map<String, List<PartitionInfo>> getKafkaMetadata(JobContext context){
+    Properties props = new Properties();
+    KafkaConsumer<byte[], byte[]> kafkaConsumer = new KafkaConsumer<byte[], byte[]>(props);
+    return kafkaConsumer.listTopics();
+  }
+
   /**
    * Gets the metadata from Kafka
    *
@@ -99,7 +106,7 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
    * get the TopicsMetadata for all topics.
    * @return the list of TopicMetadata
    */
-  public List<TopicMetadata> getKafkaMetadata(JobContext context, List<String> metaRequestTopics) {
+  private List<TopicMetadata> getKafkaMetadata(JobContext context, List<String> metaRequestTopics) {
     CamusJob.startTiming("kafkaSetupTime");
     String brokerString = CamusJob.getKafkaBrokers(context);
     if (brokerString.isEmpty())
@@ -116,14 +123,12 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
     for(String topic: metaRequestTopics) {
       List<PartitionInfo> partitionInfoList = kafkaConsumer.partitionsFor(topic);
       for (PartitionInfo partitionInfo: partitionInfoList) {
-        new PartitionMetadata()
+        partitionInfo.
       }
       partitionMetadataSet.add()
     }
 
     while (i < brokers.size() && !fetchMetaDataSucceeded) {
-
-
       SimpleConsumer consumer = createBrokerConsumer(context, brokers.get(i));
       log.info(String.format("Fetching metadata from broker %s with client id %s for %d topic(s) %s", brokers.get(i),
           consumer.clientId(), metaRequestTopics.size(), metaRequestTopics));
@@ -263,6 +268,20 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
     return regex;
   }
 
+  private Map<String, List<PartitionInfo>> filterWhitelistTopics(Map<String, List<PartitionInfo>> topicMetadataList,
+                                                                HashSet<String> whiteListTopics) {
+    Map<String, List<PartitionInfo>> filteredTopics = new HashMap<String, List<PartitionInfo>>();
+    String regex = createTopicRegEx(whiteListTopics);
+    for (String topic : topicMetadataList.keySet()) {
+      if (Pattern.matches(regex, topic)) {
+        filteredTopics.put(topic, topicMetadataList.get(topic));
+      } else {
+        log.info("Discarding topic : " + topic);
+      }
+    }
+    return filteredTopics;
+  }
+
   public List<TopicMetadata> filterWhitelistTopics(List<TopicMetadata> topicMetadataList,
       HashSet<String> whiteListTopics) {
     ArrayList<TopicMetadata> filteredTopics = new ArrayList<TopicMetadata>();
@@ -286,7 +305,7 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
     try {
 
       // Get Metadata for all topics
-      List<TopicMetadata> topicMetadataList = getKafkaMetadata(context, new ArrayList<String>());
+      Map<String, List<PartitionInfo>> topicMetadataList = getKafkaMetadata(context);
 
       // Filter any white list topics
       HashSet<String> whiteListTopics = new HashSet<String>(Arrays.asList(getKafkaWhitelistTopic(context)));
@@ -310,7 +329,7 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
           log.info("Skipping the creation of ETL request for Whole Topic : " + topicMetadata.topic() + " Exception : "
               + ErrorMapping.exceptionFor(topicMetadata.errorCode()));
         } else {
-          for (PartitionMetadata partitionMetadata : topicMetadata.partitionsMetadata()) {
+          for (PartitionMetadata partitionMetadata : scala.collection.JavaConversions.asJavaCollection(topicMetadata.partitionsMetadata())) {
             // We only care about LeaderNotAvailableCode error on partitionMetadata level
             // Error codes such as ReplicaNotAvailableCode should not stop us.
             partitionMetadata =
@@ -329,8 +348,8 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
                     + ErrorMapping.exceptionFor(partitionMetadata.errorCode()));
               }
               LeaderInfo leader =
-                  new LeaderInfo(new URI("tcp://" + partitionMetadata.leader().connectionString()),
-                      partitionMetadata.leader().id());
+                  new LeaderInfo(new URI("tcp://" + partitionMetadata.leader().get().connectionString()),
+                      partitionMetadata.leader().get().id());
               if (offsetRequestInfo.containsKey(leader)) {
                 ArrayList<TopicAndPartition> topicAndPartitions = offsetRequestInfo.get(leader);
                 topicAndPartitions.add(new TopicAndPartition(topicMetadata.topic(), partitionMetadata.partitionId()));
