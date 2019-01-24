@@ -31,13 +31,17 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.net.URI;
 import java.security.InvalidParameterException;
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 /**
@@ -92,74 +96,71 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
     return new EtlRecordReader(this, split, context);
   }
 
-  private Map<String, List<PartitionInfo>> getKafkaMetadata(JobContext context){
+  private Map<String, List<PartitionInfo>> getKafkaMetadata(JobContext context, Set<String> whiteListTopics, Set<String> blackListTopics){
     Properties props = new Properties();
     KafkaConsumer<byte[], byte[]> kafkaConsumer = new KafkaConsumer<byte[], byte[]>(props);
-    return kafkaConsumer.listTopics();
+    Map<String, List<PartitionInfo>> topicPartitions = kafkaConsumer.listTopics();
+
+    // Filter any white list topics
+    if (!whiteListTopics.isEmpty()) {
+      topicPartitions = filterWhitelistTopics(topicPartitions, whiteListTopics);
+    }
+
+    // Filter all blacklist topics
+    String regex = "";
+    if (!blackListTopics.isEmpty()) {
+      regex = createTopicRegEx(blackListTopics);
+    }
+
+    Set<String> filteredTopics = topicPartitions.keySet();
+
+    for (String topic : topicPartitions.keySet()) {
+      if (Pattern.matches(regex, topic)) {
+        log.info("Discarding topic (blacklisted): " + topic);
+      } else if (!createMessageDecoder(context, topic)) {
+        log.info("Discarding topic (Decoder generation failed) : " + topic);
+      }
+    }
+
+    List<TopicPartition> topicPartitionInfo = new ArrayList<TopicPartition>();
+    for(Entry<String, List<PartitionInfo>> entry : topicPartitions.entrySet()) {
+      for (PartitionInfo partitionInfo: entry.getValue()) {
+        topicPartitionInfo.add(new TopicPartition(partitionInfo.topic(), partitionInfo.partition()));
+      }
+    }
+
+    Map<TopicPartition, Long> beginningOffsets = kafkaConsumer.beginningOffsets(topicPartitionInfo);
+    Map<TopicPartition, Long> endOffsets = kafkaConsumer.endOffsets(topicPartitionInfo);
+    if (!beginningOffsets.keySet().containsAll(endOffsets.keySet()) && endOffsets.keySet().containsAll(beginningOffsets.keySet())) {
+      log.error("Different number of beginningOffsets and endOffsets, " + beginningOffsets.size() + " vs " + endOffsets.size());
+      log.info("Beginning offsets topics: " + beginningOffsets.keySet().stream().map(TopicPartition::topic).collect(Collectors.joining(", ")));
+      log.info("End offsets topics: " + endOffsets.keySet().stream().map(TopicPartition::topic).collect(Collectors.joining(", ")));
+      throw new RuntimeException("Found topics with with inconsistent begin/end offsets counts");
+    }
+
+
+
+    Map<TopicPartition, PartitionOffsets> topicPartOffset = Stream.of(beginningOffsets, endOffsets)
+            .flatMap(map -> map.entrySet().stream()).collect(Collectors.toMap(EtlInputFormatKafkaConsumer::getKey, EtlInputFormatKafkaConsumer::getValue, (beg,end) -> new PartitionOffsets(beg, (Long)end)));
+            //.collect(Collectors.toMap(Entry::getKey, Entry::getValue, (beg, end) -> new PartitionOffsets((Long)beg, (Long)end)));
+
   }
 
-  /**
-   * Gets the metadata from Kafka
-   *
-   * @param context
-   * @param metaRequestTopics specify the list of topics to get topicMetadata. The empty list means
-   * get the TopicsMetadata for all topics.
-   * @return the list of TopicMetadata
-   */
-  private List<TopicMetadata> getKafkaMetadata(JobContext context, List<String> metaRequestTopics) {
-    CamusJob.startTiming("kafkaSetupTime");
-    String brokerString = CamusJob.getKafkaBrokers(context);
-    if (brokerString.isEmpty())
-      throw new InvalidParameterException("kafka.brokers must contain at least one node");
-    List<String> brokers = Arrays.asList(brokerString.split("\\s*,\\s*"));
-    Collections.shuffle(brokers);
-    boolean fetchMetaDataSucceeded = false;
-    int i = 0;
-    Exception savedException = null;
+  private static TopicPartition getKey(Map.Entry<TopicPartition, Long> toBeResolved) {
+    return toBeResolved.getKey();
+  }
 
-    List<TopicMetadata> topicMetadataList = new ArrayList<TopicMetadata>();
-    Properties props = new Properties();
-    KafkaConsumer<byte[], byte[]> kafkaConsumer = new KafkaConsumer<byte[], byte[]>(props);
-    for(String topic: metaRequestTopics) {
-      List<PartitionInfo> partitionInfoList = kafkaConsumer.partitionsFor(topic);
-      for (PartitionInfo partitionInfo: partitionInfoList) {
-        partitionInfo.
-      }
-      partitionMetadataSet.add()
-    }
+  private static Long getValue(Map.Entry<TopicPartition, Long> toBeResolved) {
+    return toBeResolved.getValue();
+  }
 
-    while (i < brokers.size() && !fetchMetaDataSucceeded) {
-      SimpleConsumer consumer = createBrokerConsumer(context, brokers.get(i));
-      log.info(String.format("Fetching metadata from broker %s with client id %s for %d topic(s) %s", brokers.get(i),
-          consumer.clientId(), metaRequestTopics.size(), metaRequestTopics));
-      try {
-        for (int iter = 0; iter < NUM_TRIES_TOPIC_METADATA; iter++) {
-          try {
-            topicMetadataList = consumer.send(new TopicMetadataRequest(metaRequestTopics)).topicsMetadata();
-            fetchMetaDataSucceeded = true;
-            break;
-          } catch (Exception e) {
-            savedException = e;
-            log.warn(String.format(
-                "Fetching topic metadata with client id %s for topics [%s] from broker [%s] failed, iter[%s]",
-                consumer.clientId(), metaRequestTopics, brokers.get(i), iter), e);
-            try {
-              Thread.sleep((long) (Math.random() * (iter + 1) * 1000));
-            } catch (InterruptedException ex) {
-              log.warn("Caught InterruptedException: " + ex);
-            }
-          }
-        }
-      } finally {
-        consumer.close();
-        i++;
-      }
+  private class PartitionOffsets{
+    long beginningOffset = 0;
+    long endOffset = 0;
+    public PartitionOffsets(long beginningOffset, long endOffset) {
+      this.beginningOffset = beginningOffset;
+      this.endOffset = endOffset;
     }
-    if (!fetchMetaDataSucceeded) {
-      throw new RuntimeException("Failed to obtain metadata!", savedException);
-    }
-    CamusJob.stopTiming("kafkaSetupTime");
-    return topicMetadataList;
   }
 
   /**
@@ -256,7 +257,7 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
     return sb.toString();
   }
 
-  public String createTopicRegEx(HashSet<String> topicsSet) {
+  private String createTopicRegEx(Set<String> topicsSet) {
     String regex = "";
     StringBuilder stringbuilder = new StringBuilder();
     for (String whiteList : topicsSet) {
@@ -269,7 +270,7 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
   }
 
   private Map<String, List<PartitionInfo>> filterWhitelistTopics(Map<String, List<PartitionInfo>> topicMetadataList,
-                                                                HashSet<String> whiteListTopics) {
+                                                                Set<String> whiteListTopics) {
     Map<String, List<PartitionInfo>> filteredTopics = new HashMap<String, List<PartitionInfo>>();
     String regex = createTopicRegEx(whiteListTopics);
     for (String topic : topicMetadataList.keySet()) {
@@ -282,88 +283,20 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
     return filteredTopics;
   }
 
-  public List<TopicMetadata> filterWhitelistTopics(List<TopicMetadata> topicMetadataList,
-      HashSet<String> whiteListTopics) {
-    ArrayList<TopicMetadata> filteredTopics = new ArrayList<TopicMetadata>();
-    String regex = createTopicRegEx(whiteListTopics);
-    for (TopicMetadata topicMetadata : topicMetadataList) {
-      if (Pattern.matches(regex, topicMetadata.topic())) {
-        filteredTopics.add(topicMetadata);
-      } else {
-        log.info("Discarding topic : " + topicMetadata.topic());
-      }
-    }
-    return filteredTopics;
-  }
-
   @Override
   public List<InputSplit> getSplits(JobContext context) throws IOException, InterruptedException {
     CamusJob.startTiming("getSplits");
     ArrayList<CamusRequest> finalRequests;
-    HashMap<LeaderInfo, ArrayList<TopicAndPartition>> offsetRequestInfo =
-        new HashMap<LeaderInfo, ArrayList<TopicAndPartition>>();
     try {
-
-      // Get Metadata for all topics
-      Map<String, List<PartitionInfo>> topicMetadataList = getKafkaMetadata(context);
 
       // Filter any white list topics
       HashSet<String> whiteListTopics = new HashSet<String>(Arrays.asList(getKafkaWhitelistTopic(context)));
-      if (!whiteListTopics.isEmpty()) {
-        topicMetadataList = filterWhitelistTopics(topicMetadataList, whiteListTopics);
-      }
-
       // Filter all blacklist topics
       HashSet<String> blackListTopics = new HashSet<String>(Arrays.asList(getKafkaBlacklistTopic(context)));
-      String regex = "";
-      if (!blackListTopics.isEmpty()) {
-        regex = createTopicRegEx(blackListTopics);
-      }
+      
+      // Get Metadata for all topics
+      Map<String, List<PartitionInfo>> topicMetadataList = getKafkaMetadata(context, whiteListTopics, blackListTopics);
 
-      for (TopicMetadata topicMetadata : topicMetadataList) {
-        if (Pattern.matches(regex, topicMetadata.topic())) {
-          log.info("Discarding topic (blacklisted): " + topicMetadata.topic());
-        } else if (!createMessageDecoder(context, topicMetadata.topic())) {
-          log.info("Discarding topic (Decoder generation failed) : " + topicMetadata.topic());
-        } else if (topicMetadata.errorCode() != ErrorMapping.NoError()) {
-          log.info("Skipping the creation of ETL request for Whole Topic : " + topicMetadata.topic() + " Exception : "
-              + ErrorMapping.exceptionFor(topicMetadata.errorCode()));
-        } else {
-          for (PartitionMetadata partitionMetadata : scala.collection.JavaConversions.asJavaCollection(topicMetadata.partitionsMetadata())) {
-            // We only care about LeaderNotAvailableCode error on partitionMetadata level
-            // Error codes such as ReplicaNotAvailableCode should not stop us.
-            partitionMetadata =
-                this.refreshPartitionMetadataOnLeaderNotAvailable(partitionMetadata, topicMetadata, context,
-                    NUM_TRIES_PARTITION_METADATA);
-
-            if (partitionMetadata.errorCode() == ErrorMapping.LeaderNotAvailableCode()) {
-              log.info("Skipping the creation of ETL request for Topic : " + topicMetadata.topic()
-                  + " and Partition : " + partitionMetadata.partitionId() + " Exception : "
-                  + ErrorMapping.exceptionFor(partitionMetadata.errorCode()));
-              reportJobFailureDueToLeaderNotAvailable = true;
-            } else {
-              if (partitionMetadata.errorCode() != ErrorMapping.NoError()) {
-                log.warn("Receiving non-fatal error code, Continuing the creation of ETL request for Topic : "
-                    + topicMetadata.topic() + " and Partition : " + partitionMetadata.partitionId() + " Exception : "
-                    + ErrorMapping.exceptionFor(partitionMetadata.errorCode()));
-              }
-              LeaderInfo leader =
-                  new LeaderInfo(new URI("tcp://" + partitionMetadata.leader().get().connectionString()),
-                      partitionMetadata.leader().get().id());
-              if (offsetRequestInfo.containsKey(leader)) {
-                ArrayList<TopicAndPartition> topicAndPartitions = offsetRequestInfo.get(leader);
-                topicAndPartitions.add(new TopicAndPartition(topicMetadata.topic(), partitionMetadata.partitionId()));
-                offsetRequestInfo.put(leader, topicAndPartitions);
-              } else {
-                ArrayList<TopicAndPartition> topicAndPartitions = new ArrayList<TopicAndPartition>();
-                topicAndPartitions.add(new TopicAndPartition(topicMetadata.topic(), partitionMetadata.partitionId()));
-                offsetRequestInfo.put(leader, topicAndPartitions);
-              }
-
-            }
-          }
-        }
-      }
     } catch (Exception e) {
       log.error("Unable to pull requests from Kafka brokers. Exiting the program", e);
       throw new IOException("Unable to pull requests from Kafka brokers.", e);
