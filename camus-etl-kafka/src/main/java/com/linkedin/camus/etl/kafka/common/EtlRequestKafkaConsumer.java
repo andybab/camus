@@ -46,15 +46,23 @@ public class EtlRequestKafkaConsumer implements CamusRequest {
   }
 
   public EtlRequestKafkaConsumer(JobContext context, String topic, int partition) {
+    this.context = context;
+    this.topic = topic;
+    this.partition = partition;
+    setOffset(offset);
   }
 
   public EtlRequestKafkaConsumer(JobContext context, String topic, int partition, URI brokerUri) {
+    this.context = context;
+    this.topic = topic;
+    this.uri = brokerUri;
+    this.partition = partition;
+    setOffset(offset);
   }
 
   public EtlRequestKafkaConsumer(JobContext context, String topic, int partition, URI brokerUri, long offset) {
     this.context = context;
     this.topic = topic;
-    this.leaderId = leaderId;
     this.uri = brokerUri;
     this.partition = partition;
     setOffset(offset);
@@ -83,7 +91,6 @@ public class EtlRequestKafkaConsumer implements CamusRequest {
 
   @Override
   public void setAvgMsgSize(long size) {
-
   }
 
   @Override
@@ -103,12 +110,12 @@ public class EtlRequestKafkaConsumer implements CamusRequest {
 
   @Override
   public void setOffset(long offset) {
-
+    this.offset = offset;
   }
 
   @Override
   public void setURI(URI uri) {
-
+    this.uri = uri;
   }
 
   @Override
