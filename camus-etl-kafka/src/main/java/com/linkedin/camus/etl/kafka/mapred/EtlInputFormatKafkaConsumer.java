@@ -96,7 +96,7 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
     return new EtlRecordReader(this, split, context);
   }
 
-  private Map<String, List<PartitionInfo>> getKafkaMetadata(JobContext context, Set<String> whiteListTopics, Set<String> blackListTopics){
+  private Map<TopicPartition, PartitionOffsets> getKafkaMetadata(JobContext context, Set<String> whiteListTopics, Set<String> blackListTopics){
     Properties props = new Properties();
     KafkaConsumer<byte[], byte[]> kafkaConsumer = new KafkaConsumer<byte[], byte[]>(props);
     Map<String, List<PartitionInfo>> topicPartitions = kafkaConsumer.listTopics();
@@ -138,12 +138,16 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
       throw new RuntimeException("Found topics with with inconsistent begin/end offsets counts");
     }
 
+    Map<TopicPartition, PartitionOffsets> topicPartOffset = new HashMap<>();
 
+    for(Map.Entry<TopicPartition, Long> tpBeg : beginningOffsets.entrySet()) {
+      long begOffset = tpBeg.getValue();
+      long endOffset = endOffsets.get(tpBeg.getKey());
 
-    Map<TopicPartition, PartitionOffsets> topicPartOffset = Stream.of(beginningOffsets, endOffsets)
-            .flatMap(map -> map.entrySet().stream()).collect(Collectors.toMap(EtlInputFormatKafkaConsumer::getKey, EtlInputFormatKafkaConsumer::getValue, (beg,end) -> new PartitionOffsets(beg, (Long)end)));
-            //.collect(Collectors.toMap(Entry::getKey, Entry::getValue, (beg, end) -> new PartitionOffsets((Long)beg, (Long)end)));
+      topicPartOffset.put(tpBeg.getKey(), new PartitionOffsets(begOffset, endOffset));
+    }
 
+    return topicPartOffset;
   }
 
   private static TopicPartition getKey(Map.Entry<TopicPartition, Long> toBeResolved) {
@@ -161,6 +165,63 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
       this.beginningOffset = beginningOffset;
       this.endOffset = endOffset;
     }
+  }
+
+  /**
+   * Gets the latest offsets and create the requests as needed
+   *
+   * @param context
+   * @param topicPartitionOffsets
+   * @return
+   */
+  public ArrayList<CamusRequest> fetchLatestOffsetAndCreateEtlRequests(JobContext context,
+                                                                       Map<TopicPartition, PartitionOffsets> topicPartitionOffsets) {
+    ArrayList<CamusRequest> finalRequests = new ArrayList<CamusRequest>();
+    for (LeaderInfo leader : offsetRequestInfo.keySet()) {
+      SimpleConsumer consumer = createSimpleConsumer(context, leader.getUri().getHost(), leader.getUri().getPort());
+      // Latest Offset
+      PartitionOffsetRequestInfo partitionLatestOffsetRequestInfo =
+              new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.LatestTime(), 1);
+      // Earliest Offset
+      PartitionOffsetRequestInfo partitionEarliestOffsetRequestInfo =
+              new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.EarliestTime(), 1);
+      Map<TopicAndPartition, PartitionOffsetRequestInfo> latestOffsetInfo =
+              new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
+      Map<TopicAndPartition, PartitionOffsetRequestInfo> earliestOffsetInfo =
+              new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
+      ArrayList<TopicAndPartition> topicAndPartitions = offsetRequestInfo.get(leader);
+      for (TopicAndPartition topicAndPartition : topicAndPartitions) {
+        latestOffsetInfo.put(topicAndPartition, partitionLatestOffsetRequestInfo);
+        earliestOffsetInfo.put(topicAndPartition, partitionEarliestOffsetRequestInfo);
+      }
+
+      OffsetResponse latestOffsetResponse = getLatestOffsetResponse(consumer, latestOffsetInfo, context);
+      OffsetResponse earliestOffsetResponse = null;
+      if (latestOffsetResponse != null) {
+        earliestOffsetResponse = getLatestOffsetResponse(consumer, earliestOffsetInfo, context);
+      }
+      consumer.close();
+      if (earliestOffsetResponse == null) {
+        log.warn(generateLogWarnForSkippedTopics(earliestOffsetInfo, consumer));
+        reportJobFailureUnableToGetOffsetFromKafka = true;
+        continue;
+      }
+
+      for (TopicAndPartition topicAndPartition : topicAndPartitions) {
+        long latestOffset = latestOffsetResponse.offsets(topicAndPartition.topic(), topicAndPartition.partition())[0];
+        long earliestOffset =
+                earliestOffsetResponse.offsets(topicAndPartition.topic(), topicAndPartition.partition())[0];
+
+        //TODO: factor out kafka specific request functionality
+        CamusRequest etlRequest =
+                new EtlRequestKafkaConsumer(context, topicAndPartition.topic(), Integer.toString(leader.getLeaderId()),
+                        topicAndPartition.partition(), leader.getUri());
+        etlRequest.setLatestOffset(latestOffset);
+        etlRequest.setEarliestOffset(earliestOffset);
+        finalRequests.add(etlRequest);
+      }
+    }
+    return finalRequests;
   }
 
   /**
@@ -295,14 +356,14 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
       HashSet<String> blackListTopics = new HashSet<String>(Arrays.asList(getKafkaBlacklistTopic(context)));
       
       // Get Metadata for all topics
-      Map<String, List<PartitionInfo>> topicMetadataList = getKafkaMetadata(context, whiteListTopics, blackListTopics);
+      Map<TopicPartition, PartitionOffsets> topicMetadataList = getKafkaMetadata(context, whiteListTopics, blackListTopics);
 
+      // Get the latest offsets and generate the EtlRequests
+      finalRequests = fetchLatestOffsetAndCreateEtlRequests(context, topicMetadataList);
     } catch (Exception e) {
       log.error("Unable to pull requests from Kafka brokers. Exiting the program", e);
       throw new IOException("Unable to pull requests from Kafka brokers.", e);
     }
-    // Get the latest offsets and generate the EtlRequests
-    finalRequests = fetchLatestOffsetAndCreateEtlRequests(context, offsetRequestInfo);
 
     Collections.sort(finalRequests, new Comparator<CamusRequest>() {
       @Override
@@ -396,9 +457,7 @@ public class EtlInputFormatKafkaConsumer extends InputFormat<EtlKey, CamusWrappe
     String[] arr = getMoveToLatestTopics(context);
 
     if (arr != null) {
-      for (String topic : arr) {
-        topics.add(topic);
-      }
+      topics.addAll(Arrays.asList(arr));
     }
 
     return topics;
