@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
 
+import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
 import kafka.javaapi.FetchRequest;
 import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.consumer.SimpleConsumer;
@@ -16,7 +17,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.linkedin.camus.etl.kafka.CamusJob;
-import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
 
 
 public class KafkaReaderTest {

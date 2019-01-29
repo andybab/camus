@@ -54,7 +54,7 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
   }
 
   public void addOffset(EtlKey key) {
-    String topicPart = key.getTopic() + "-" + key.getLeaderId() + "-" + key.getPartition();
+    String topicPart = key.getTopic() + "-" + "-" + key.getPartition();
     EtlKey offsetKey = new EtlKey(key);
 
     if (offsets.containsKey(topicPart)) {
@@ -162,15 +162,14 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
       throw new IOException("Could not extract metadata from working filename '" + file + "'");
     }
     String topic = m.group(1);
-    String leaderId = m.group(2);
-    String partition = m.group(3);
-    String encodedPartition = m.group(4);
+    String partition = m.group(2);
+    String encodedPartition = m.group(3);
 
     String partitionedPath =
         EtlMultiOutputFormat.getPartitioner(context, topic).generatePartitionedPath(context, topic, encodedPartition);
 
     partitionedPath += "/" + EtlMultiOutputFormat.getPartitioner(context, topic).generateFileName(context, topic,
-        leaderId, Integer.parseInt(partition), count, offset, encodedPartition);
+        Integer.parseInt(partition), count, offset, encodedPartition);
 
     return partitionedPath + recordWriterProvider.getFilenameExtension();
   }

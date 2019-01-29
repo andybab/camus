@@ -1,7 +1,7 @@
 package com.linkedin.camus.etl.kafka.common;
 
 import com.linkedin.camus.etl.kafka.CamusJob;
-import com.linkedin.camus.etl.kafka.mapred.EtlInputFormatKafkaConsumer;
+import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -40,7 +40,7 @@ public class KafkaReader {
    * @param clientTimeout
    * @param fetchBufferSize
    */
-  public KafkaReader(EtlInputFormatKafkaConsumer inputFormat, TaskAttemptContext context, EtlRequest request, int clientTimeout, int fetchBufferSize) throws Exception {
+  public KafkaReader(EtlInputFormat inputFormat, TaskAttemptContext context, EtlRequest request, int clientTimeout, int fetchBufferSize) throws Exception {
     //super(inputFormat, context, request, clientTimeout, fetchBufferSize);
 
     Properties props = new Properties();
@@ -96,7 +96,7 @@ public class KafkaReader {
     }
 
     etlKey.clear();
-    etlKey.set(kafkaRequest.getTopic(), kafkaRequest.getLeaderId(), kafkaRequest.getPartition(), currentOffset,
+    etlKey.set(kafkaRequest.getTopic(), kafkaRequest.getPartition(), currentOffset,
             consumerRecord.offset() + 1, consumerRecord.checksum());
 
     etlKey.setMessageSize(consumerRecord.serializedKeySize() + consumerRecord.serializedValueSize());

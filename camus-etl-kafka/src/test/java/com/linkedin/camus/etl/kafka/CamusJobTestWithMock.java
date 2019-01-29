@@ -16,7 +16,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 
+import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
 import kafka.cluster.Broker;
+import kafka.cluster.BrokerEndPoint;
 import kafka.javaapi.FetchRequest;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.OffsetRequest;
@@ -37,6 +39,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
+import org.apache.kafka.common.network.ListenerName;
+import org.apache.kafka.common.security.auth.SecurityProtocol;
 import org.easymock.EasyMock;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -49,7 +53,6 @@ import com.google.gson.Gson;
 import com.linkedin.camus.etl.kafka.coders.JsonStringMessageDecoder;
 import com.linkedin.camus.etl.kafka.common.EtlCountsForUnitTest;
 import com.linkedin.camus.etl.kafka.common.SequenceFileRecordWriterProvider;
-import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
 import com.linkedin.camus.etl.kafka.mapred.EtlInputFormatForUnitTest;
 import com.linkedin.camus.etl.kafka.mapred.EtlMultiOutputFormat;
 import com.linkedin.camus.etl.kafka.mapred.EtlRecordReaderForUnitTest;
@@ -171,7 +174,7 @@ public class CamusJobTestWithMock {
     PartitionMetadata pMeta = EasyMock.createMock(PartitionMetadata.class);
     mocks.add(pMeta);
     EasyMock.expect(pMeta.errorCode()).andReturn((short)0).anyTimes();
-    Broker broker = new Broker(0, "localhost", 2121);
+    BrokerEndPoint broker = new BrokerEndPoint(0, "localhost", 2121);
     EasyMock.expect(pMeta.leader()).andReturn(broker).anyTimes();
     EasyMock.expect(pMeta.partitionId()).andReturn(PARTITION_1_ID).anyTimes();
     List<PartitionMetadata> partitionMetadatas = new ArrayList<PartitionMetadata>();
@@ -207,7 +210,7 @@ public class CamusJobTestWithMock {
     for (MyMessage myMessage:myMessages) {
       String payload = gson.toJson(myMessage);
       String msgKey = Integer.toString(PARTITION_1_ID);
-      Message message = new Message(payload.getBytes(), msgKey.getBytes());
+      Message message = new Message(payload.getBytes());
       messages.add(message);
     }
     ByteBufferMessageSet messageSet = new ByteBufferMessageSet(messages);

@@ -40,9 +40,9 @@ public class EtlKeyTest {
 
   @Test
   public void testEqualsMethodForEqualObjects() throws Exception {
-    final EtlKey etlKeyA = new EtlKey("topic_id", "leader_id", 2);
+    final EtlKey etlKeyA = new EtlKey("topic_id", 2);
     etlKeyA.setTime(123);
-    final EtlKey etlKeyB = new EtlKey("topic_id", "leader_id", 2);
+    final EtlKey etlKeyB = new EtlKey("topic_id", 2);
     etlKeyB.setTime(123);
 
     assertEquals(etlKeyA, etlKeyB);
@@ -50,9 +50,9 @@ public class EtlKeyTest {
 
   @Test
   public void testEqualsMethodForNonEqualObjects() throws Exception {
-    final EtlKey etlKeyA = new EtlKey("topic_id", "leader_id", 2);
+    final EtlKey etlKeyA = new EtlKey("topic_id", 2);
     etlKeyA.setTime(123);
-    final EtlKey etlKeyB = new EtlKey("different_topic_id", "leader_id", 2);
+    final EtlKey etlKeyB = new EtlKey("different_topic_id", 2);
     etlKeyB.setTime(123);
 
     assertFalse(etlKeyA.equals(etlKeyB));
@@ -60,9 +60,9 @@ public class EtlKeyTest {
 
   @Test
   public void testHashCodeMethodForEqualObjects() throws Exception {
-    final EtlKey etlKeyA = new EtlKey("topic_id", "leader_id", 2);
+    final EtlKey etlKeyA = new EtlKey("topic_id", 2);
     etlKeyA.setTime(123);
-    final EtlKey etlKeyB = new EtlKey("topic_id", "leader_id", 2);
+    final EtlKey etlKeyB = new EtlKey("topic_id", 2);
     etlKeyB.setTime(123);
 
     assertEquals(etlKeyA.hashCode(), etlKeyB.hashCode());
@@ -70,9 +70,9 @@ public class EtlKeyTest {
 
   @Test
   public void testHashCodeMethodForNonEqualObjects() throws Exception {
-    final EtlKey etlKeyA = new EtlKey("topic_id", "leader_id", 2);
+    final EtlKey etlKeyA = new EtlKey("topic_id", 2);
     etlKeyA.setTime(123);
-    final EtlKey etlKeyB = new EtlKey("different_topic_id", "leader_id", 2);
+    final EtlKey etlKeyB = new EtlKey("different_topic_id", 2);
     etlKeyB.setTime(123);
 
     assertFalse(etlKeyA.hashCode() == etlKeyB.hashCode());

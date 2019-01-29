@@ -6,7 +6,7 @@ import com.linkedin.camus.coders.MessageDecoder;
 import com.linkedin.camus.etl.kafka.CamusJob;
 import com.linkedin.camus.etl.kafka.coders.MessageDecoderFactory;
 import com.linkedin.camus.etl.kafka.common.EtlKey;
-import com.linkedin.camus.etl.kafka.common.EtlRequestKafkaConsumer;
+import com.linkedin.camus.etl.kafka.common.EtlRequest;
 import com.linkedin.camus.etl.kafka.common.ExceptionWritable;
 import com.linkedin.camus.etl.kafka.common.KafkaReader;
 import com.linkedin.camus.schemaregistry.SchemaNotFoundException;
@@ -42,7 +42,7 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
 
   protected TaskAttemptContext context;
 
-  private EtlInputFormatKafkaConsumer inputFormat;
+  private EtlInputFormat inputFormat;
   private Mapper<EtlKey, Writable, EtlKey, Writable>.Context mapperContext;
   private KafkaReader reader;
 
@@ -79,7 +79,7 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
    * @throws IOException
    * @throws InterruptedException
    */
-  public EtlRecordReader(EtlInputFormatKafkaConsumer inputFormat, InputSplit split, TaskAttemptContext context) throws IOException,
+  public EtlRecordReader(EtlInputFormat inputFormat, InputSplit split, TaskAttemptContext context) throws IOException,
       InterruptedException {
     this.inputFormat = inputFormat;
     initialize(split, context);
@@ -241,7 +241,7 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
                 / this.numRecordsReadForCurrentPartition);
           }
 
-          EtlRequestKafkaConsumer request = (EtlRequestKafkaConsumer) split.popRequest();
+          EtlRequest request = (EtlRequest) split.popRequest();
           if (request == null) {
             return false;
           }
@@ -255,13 +255,13 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
             endTimeStamp = 0;
           }
 
-          key.set(request.getTopic(), request.getLeaderId(), request.getPartition(), request.getOffset(),
+          key.set(request.getTopic(), request.getPartition(), request.getOffset(),
               request.getOffset(), 0);
           value = null;
           log.info("\n\ntopic:" + request.getTopic() + " partition:" + request.getPartition() + " beginOffset:"
               + request.getOffset() + " estimatedLastOffset:" + request.getLastOffset());
           statusMsg += statusMsg.length() > 0 ? "; " : "";
-          statusMsg += request.getTopic() + ":" + request.getLeaderId() + ":" + request.getPartition();
+          statusMsg += request.getTopic() + ":" + request.getPartition();
           context.setStatus(statusMsg);
 
           if (reader != null) {

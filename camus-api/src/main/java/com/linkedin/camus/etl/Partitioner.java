@@ -47,7 +47,6 @@ public abstract class Partitioner extends Configured {
      *
      * @param context The JobContext
      * @param topic The topic name
-     * @param brokerId the brokerId
      * @param partitionId the partitionId
      * @param count totalEventCount in file
      * @param offset final offset in partition was read too.
@@ -55,7 +54,7 @@ public abstract class Partitioner extends Configured {
      *                         above.
      * @return A path string where the avro files will be moved to.
      */
-    public abstract String generateFileName(JobContext context, String topic, String brokerId, int partitionId, 
+    public abstract String generateFileName(JobContext context, String topic, int partitionId,
         int count, long offset, String encodedPartition);
     
     /**
@@ -63,13 +62,12 @@ public abstract class Partitioner extends Configured {
      *
      * @param context The JobContext
      * @param topic The topic name
-     * @param brokerId the brokerId
      * @param partitionId the partitionId
      * @param encodedPartition The encoded partition values. This will be the return of the the encodePartition() method
      *                         above.
      * @return A path string where the avro files will be moved to.
      */
-    public abstract String getWorkingFileName(JobContext context, String topic, String brokerId, 
+    public abstract String getWorkingFileName(JobContext context, String topic,
         int partitionId, String encodedPartition);
 
        

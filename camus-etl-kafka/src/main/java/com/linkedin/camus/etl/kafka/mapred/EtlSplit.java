@@ -9,7 +9,6 @@ import java.util.List;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.InputSplit;
 
-import com.linkedin.camus.etl.kafka.common.EtlRequest;
 import com.linkedin.camus.workallocater.CamusRequest;
 
 

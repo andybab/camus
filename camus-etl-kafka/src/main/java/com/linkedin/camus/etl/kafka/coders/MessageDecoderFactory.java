@@ -7,7 +7,6 @@ import org.apache.hadoop.mapreduce.JobContext;
 
 import com.linkedin.camus.coders.MessageDecoder;
 import com.linkedin.camus.coders.MessageDecoderException;
-import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
 
 
 public class MessageDecoderFactory {
