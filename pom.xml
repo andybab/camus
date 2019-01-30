@@ -101,10 +101,6 @@
                 <version>0.10.2.1</version>
                 <exclusions>
                     <exclusion>
-                        <groupId>org.slf4j</groupId>
-                        <artifactId>slf4j-simple</artifactId>
-                    </exclusion>
-                    <exclusion>
                         <groupId>org.scala-lang</groupId>
                         <artifactId>scala-compiler</artifactId>
                     </exclusion>

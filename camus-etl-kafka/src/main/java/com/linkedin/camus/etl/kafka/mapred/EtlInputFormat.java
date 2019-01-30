@@ -85,7 +85,7 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
     return new EtlRecordReader(this, split, context);
   }
 
-  private Map<org.apache.kafka.common.TopicPartition, PartitionOffsets> getKafkaMetadata(JobContext context, Set<String> whiteListTopics, Set<String> blackListTopics){
+  public Map<org.apache.kafka.common.TopicPartition, PartitionOffsets> getKafkaMetadata(JobContext context, Set<String> whiteListTopics, Set<String> blackListTopics){
     Properties props = new Properties();
     KafkaConsumer<byte[], byte[]> kafkaConsumer = new KafkaConsumer<byte[], byte[]>(props);
     Map<String, List<PartitionInfo>> topicPartitions = kafkaConsumer.listTopics();

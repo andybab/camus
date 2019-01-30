@@ -91,11 +91,6 @@
             <version>1.6</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka-clients</artifactId>
-            <scope>compile</scope>
-        </dependency>
     </dependencies>
 
     <!-- 	<build> -->

@@ -7,6 +7,7 @@ import static org.junit.Assert.assertTrue;
 import com.linkedin.camus.etl.kafka.coders.FailDecoder;
 import com.linkedin.camus.etl.kafka.coders.JsonStringMessageDecoder;
 import com.linkedin.camus.etl.kafka.common.SequenceFileRecordWriterProvider;
+import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
 import com.linkedin.camus.etl.kafka.mapred.EtlMultiOutputFormat;
 
 import kafka.javaapi.producer.Producer;

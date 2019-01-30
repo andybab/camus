@@ -27,7 +27,6 @@ public class EtlKeyTest {
     in.reset(out.getData(), out.getLength());
 
     newKey.readFields(in);
-    assertEquals("leaderId", newKey.getLeaderId());
     assertEquals(1, newKey.getPartition());
     assertEquals(2, newKey.getBeginOffset());
     assertEquals(3, newKey.getOffset());

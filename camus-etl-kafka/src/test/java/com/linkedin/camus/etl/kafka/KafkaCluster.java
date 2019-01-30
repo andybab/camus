@@ -9,11 +9,12 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Random;
 
+import kafka.metrics.KafkaMetricsReporter$;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
-import kafka.utils.Time;
-import kafka.utils.Utils;
 
+import org.apache.kafka.common.utils.SystemTime;
+import org.apache.kafka.common.utils.Time;
 import org.apache.zookeeper.server.NIOServerCnxn;
 import org.apache.zookeeper.server.ZooKeeperServer;
 
@@ -88,28 +89,9 @@ public class KafkaCluster {
   }
 
   private static KafkaServer startBroker(Properties props) {
-    KafkaServer server = new KafkaServer(new KafkaConfig(props), new SystemTime());
+    KafkaServer server = null;
     server.startup();
     return server;
-  }
-
-  public static class SystemTime implements Time {
-
-    public long milliseconds() {
-      return System.currentTimeMillis();
-    }
-
-    public long nanoseconds() {
-      return System.nanoTime();
-    }
-
-    public void sleep(long ms) {
-      try {
-        Thread.sleep(ms);
-      } catch (InterruptedException e) {
-        // Ignore
-      }
-    }
   }
 
   private static class EmbeddedZookeeper {
@@ -145,8 +127,6 @@ public class KafkaCluster {
      */
     public void shutdown() {
       factory.shutdown();
-      Utils.rm(snapshotDir);
-      Utils.rm(logDir);
     }
 
     public String getConnection() {

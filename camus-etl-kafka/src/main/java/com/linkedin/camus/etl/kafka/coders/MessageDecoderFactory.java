@@ -3,6 +3,7 @@ package com.linkedin.camus.etl.kafka.coders;
 import java.util.Map.Entry;
 import java.util.Properties;
 
+import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
 import org.apache.hadoop.mapreduce.JobContext;
 
 import com.linkedin.camus.coders.MessageDecoder;
