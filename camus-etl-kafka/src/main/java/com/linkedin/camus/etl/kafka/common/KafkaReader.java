@@ -2,6 +2,7 @@ package com.linkedin.camus.etl.kafka.common;
 
 import com.linkedin.camus.etl.kafka.CamusJob;
 import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
+import kafka.message.Message;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -101,8 +102,15 @@ public class KafkaReader {
     currentOffset = consumerRecord.offset() + 1; // increase offset
     currentCount++; // increase count
 
+    Message readMessage;
+    if (key == null){
+      readMessage = new Message(payload);
+    } else {
+      readMessage = new Message(payload, key, Message.NoTimestamp(), Message.CurrentMagicValue());
+    }
+
     return new KafkaMessage(payload, key, kafkaRequest.getTopic(), kafkaRequest.getPartition(),
-            consumerRecord.offset(), consumerRecord.checksum());
+            consumerRecord.offset(), readMessage.checksum());
   }
 
   public boolean fetch() throws IOException {

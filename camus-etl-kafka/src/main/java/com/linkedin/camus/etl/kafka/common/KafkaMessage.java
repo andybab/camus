@@ -58,6 +58,7 @@ public class KafkaMessage implements com.linkedin.camus.coders.Message {
         return checksum;
     }
 
+    @Override
     public void validate() throws IOException {
         // check the checksum of message.
         Message readMessage;
