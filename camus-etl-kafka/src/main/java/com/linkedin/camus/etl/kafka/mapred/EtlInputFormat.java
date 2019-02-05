@@ -85,8 +85,15 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
     return new EtlRecordReader(this, split, context);
   }
 
-  public Map<org.apache.kafka.common.TopicPartition, PartitionOffsets> getKafkaMetadata(JobContext context, Set<String> whiteListTopics, Set<String> blackListTopics){
+  public Map<org.apache.kafka.common.TopicPartition, PartitionOffsets> getKafkaMetadata(JobContext context, Set<String> whiteListTopics, Set<String> blackListTopics) {
     Properties props = new Properties();
+    props.put("bootstrap.servers", CamusJob.getKafkaBrokers(context));
+    props.put("group.id", CamusJob.getKafkaClientName(context));
+    props.put("enable.auto.commit", "false");
+    props.put("session.timeout.ms", "30000");
+    props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+
     KafkaConsumer<byte[], byte[]> kafkaConsumer = new KafkaConsumer<byte[], byte[]>(props);
     Map<String, List<PartitionInfo>> topicPartitions = kafkaConsumer.listTopics();
 

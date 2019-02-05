@@ -59,10 +59,8 @@ public class KafkaReader {
     this.currentCount = 0;
     this.totalFetchTime = 0;
 
-    String topic = "foo";
     this.topicPartition = new TopicPartition(this.kafkaRequest.getTopic(), this.kafkaRequest.getPartition());
     //consumer.assign(Arrays.asList(topicPartition, partition1));
-
 
     this.kafkaConsumer = new KafkaConsumer<byte[], byte[]>(props);
     this.kafkaConsumer.assign(Arrays.asList(topicPartition));
