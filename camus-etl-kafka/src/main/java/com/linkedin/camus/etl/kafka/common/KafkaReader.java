@@ -48,8 +48,8 @@ public class KafkaReader {
     props.put("group.id", CamusJob.getKafkaClientName(context));
     props.put("enable.auto.commit", "false");
     props.put("session.timeout.ms", "30000");
-    props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-    props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
+    props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
 
     this.context = context;
     this.kafkaRequest = request;

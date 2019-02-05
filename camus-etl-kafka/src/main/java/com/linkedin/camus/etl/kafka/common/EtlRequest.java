@@ -34,8 +34,8 @@ public class EtlRequest implements CamusRequest {
     props.put("group.id", "camus-etl");
     props.put("enable.auto.commit", "false");
     props.put("session.timeout.ms", "30000");
-    props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-    props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
+    props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
     return props;
   }
 
