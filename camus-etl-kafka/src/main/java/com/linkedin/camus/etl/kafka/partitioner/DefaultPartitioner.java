@@ -52,7 +52,6 @@ public class DefaultPartitioner extends Partitioner {
     StringBuilder sb = new StringBuilder();
     sb.append(topic);
     sb.append(".").append(partitionId);
-    sb.append(".").append(count);
     sb.append(".").append(offset);
     sb.append(".").append(encodedPartition);
 

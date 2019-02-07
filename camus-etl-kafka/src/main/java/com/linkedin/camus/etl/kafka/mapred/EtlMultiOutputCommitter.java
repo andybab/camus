@@ -54,7 +54,7 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
   }
 
   public void addOffset(EtlKey key) {
-    String topicPart = key.getTopic() + "-" + "-" + key.getPartition();
+    String topicPart = key.getTopic() + "-" + key.getPartition();
     EtlKey offsetKey = new EtlKey(key);
 
     if (offsets.containsKey(topicPart)) {
@@ -81,7 +81,7 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
       throw new IllegalStateException(e);
     }
     workingFileMetadataPattern = Pattern.compile(
-        "data\\.([^\\.]+)\\.([\\d_]+)\\.(\\d+)\\.([^\\.]+)-m-\\d+" + recordWriterProvider.getFilenameExtension());
+        "data\\.([^\\.]+)\\.(\\d+)\\.([^\\.]+)-m-\\d+" + recordWriterProvider.getFilenameExtension());
     this.log = log;
   }
 

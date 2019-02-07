@@ -51,7 +51,7 @@ abstract public class BaseTimeBasedPartitioner extends Partitioner {
   @Override
   public String generateFileName(JobContext context, String topic, int partitionId, int count,
       long offset, String encodedPartition) {
-    return topic + "." + partitionId + "." + count + "." + offset + "." + encodedPartition;
+    return topic + "." + partitionId + "." + offset + "." + encodedPartition;
   }
 
   @Override

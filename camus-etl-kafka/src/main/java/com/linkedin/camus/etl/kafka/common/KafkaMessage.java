@@ -9,7 +9,6 @@ import java.io.IOException;
  * Created by michaelandrepearce on 05/04/15.
  */
 public class KafkaMessage implements com.linkedin.camus.coders.Message {
-
     byte[] payload;
     byte[] key;
 
@@ -73,5 +72,4 @@ public class KafkaMessage implements com.linkedin.camus.coders.Message {
                     offset);
         }
     }
-
 }
