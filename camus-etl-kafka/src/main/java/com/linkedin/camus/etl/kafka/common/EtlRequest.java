@@ -1,5 +1,6 @@
 package com.linkedin.camus.etl.kafka.common;
 
+import com.linkedin.camus.etl.kafka.CamusJob;
 import com.linkedin.camus.workallocater.CamusRequest;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -36,6 +37,9 @@ public class EtlRequest implements CamusRequest {
     props.put("session.timeout.ms", "30000");
     props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
     props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
+    props.put("security.protocol", CamusJob.getKafkaConsumerSecurityProtocol(context));
+    props.put("sasl.mechanism", CamusJob.getKafkaConsumerSaslMechanism(context));
+    props.put("sasl.jaas.config", CamusJob.getKafkaConsumerSaslJaasConfig(context));
     return props;
   }
 
@@ -58,6 +62,7 @@ public class EtlRequest implements CamusRequest {
     this.topic = topic;
     this.brokers = brokers;
     this.partition = partition;
+
     setOffset(offset);
   }
 

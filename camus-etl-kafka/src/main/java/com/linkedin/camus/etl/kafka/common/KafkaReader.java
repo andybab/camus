@@ -51,6 +51,9 @@ public class KafkaReader {
     props.put("session.timeout.ms", "30000");
     props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
     props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
+    props.put("security.protocol", CamusJob.getKafkaConsumerSecurityProtocol(context));
+    props.put("sasl.mechanism", CamusJob.getKafkaConsumerSaslMechanism(context));
+    props.put("sasl.jaas.config", CamusJob.getKafkaConsumerSaslJaasConfig(context));
 
     this.context = context;
     this.kafkaRequest = request;

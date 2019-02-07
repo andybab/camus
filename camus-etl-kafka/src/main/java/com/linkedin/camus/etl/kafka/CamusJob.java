@@ -110,6 +110,9 @@ public class CamusJob extends Configured implements Tool {
   public static final String KAFKA_HOST_URL = "kafka.host.url";
   public static final String KAFKA_HOST_PORT = "kafka.host.port";
   public static final String KAFKA_TIMEOUT_VALUE = "kafka.timeout.value";
+  public static final String KAFKA_CONSUMER_SASL_JAAS_CONFIG = "kafka.consumer.sasl.jaas.config";
+  public static final String KAFKA_CONSUMER_SECURITY_PROTOCOL = "kafka.consumer.security.protocol";
+  public static final String KAFKA_CONSUMER_SASL_MECHANISM = "kafka.consumer.sasl.mechanism";
   public static final String CAMUS_REPORTER_CLASS = "etl.reporter.class";
   public static final String LOG4J_CONFIGURATION = "log4j.configuration";
 
@@ -703,6 +706,18 @@ public class CamusJob extends Configured implements Tool {
 
   public static int getKafkaFetchRequestMaxWait(JobContext job) {
     return job.getConfiguration().getInt(KAFKA_FETCH_REQUEST_MAX_WAIT, 1000);
+  }
+
+  public static String getKafkaConsumerSaslJaasConfig(JobContext job) {
+    return job.getConfiguration().get(KAFKA_CONSUMER_SASL_JAAS_CONFIG, "");
+  }
+
+  public static String getKafkaConsumerSecurityProtocol(JobContext job) {
+    return job.getConfiguration().get(KAFKA_CONSUMER_SECURITY_PROTOCOL, "PLAINTEXT");
+  }
+
+  public static String getKafkaConsumerSaslMechanism(JobContext job) {
+    return job.getConfiguration().get(KAFKA_CONSUMER_SASL_MECHANISM, "PLAIN");
   }
 
   public static String getKafkaBrokers(JobContext job) {

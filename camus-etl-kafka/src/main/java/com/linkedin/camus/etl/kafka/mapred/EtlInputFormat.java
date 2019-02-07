@@ -93,6 +93,9 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
     props.put("session.timeout.ms", "30000");
     props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
     props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
+    props.put("security.protocol", CamusJob.getKafkaConsumerSecurityProtocol(context));
+    props.put("sasl.mechanism", CamusJob.getKafkaConsumerSaslMechanism(context));
+    props.put("sasl.jaas.config", CamusJob.getKafkaConsumerSaslJaasConfig(context));
 
     KafkaConsumer<byte[], byte[]> kafkaConsumer = new KafkaConsumer<byte[], byte[]>(props);
     Map<String, List<PartitionInfo>> topicPartitions = kafkaConsumer.listTopics();
