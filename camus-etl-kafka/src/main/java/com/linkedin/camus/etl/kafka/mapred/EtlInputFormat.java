@@ -143,7 +143,9 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
       long begOffset = tpBeg.getValue();
       long endOffset = endOffsets.get(tpBeg.getKey());
 
-      topicPartOffset.put(tpBeg.getKey(), new PartitionOffsets(begOffset, endOffset));
+      PartitionOffsets partitionOffsets = new PartitionOffsets(begOffset, endOffset);
+      log.info("Offsets for topic " + tpBeg.getKey() + ": " + partitionOffsets);
+      topicPartOffset.put(tpBeg.getKey(), partitionOffsets);
     }
 
     return topicPartOffset;
@@ -163,6 +165,14 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
     PartitionOffsets(long beginningOffset, long endOffset) {
       this.beginningOffset = beginningOffset;
       this.endOffset = endOffset;
+    }
+
+    @Override
+    public String toString() {
+      return "PartitionOffsets{" +
+          "beginningOffset=" + beginningOffset +
+          ", endOffset=" + endOffset +
+          '}';
     }
   }
 
@@ -269,7 +279,7 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
 
       if (request.getEarliestOffset() > request.getOffset() || request.getOffset() > request.getLastOffset()) {
         if (request.getEarliestOffset() > request.getOffset()) {
-          log.error("The earliest offset was found to be more than the current offset: " + request);
+          log.error("The earliest offset(" + request.getEarliestOffset() + ") was found to be more than the current offset("+request.getOffset()+"): " + request);
         } else {
           log.error("The current offset was found to be more than the latest offset: " + request);
         }

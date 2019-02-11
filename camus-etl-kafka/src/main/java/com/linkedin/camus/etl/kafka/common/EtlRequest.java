@@ -6,6 +6,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.log4j.Logger;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -28,6 +29,11 @@ public class EtlRequest implements CamusRequest {
   private long earliestOffset = -2;
   private long avgMsgSize = 1024;
 
+  private static Logger log = null;
+
+  public static void setLogger(Logger log) {
+    EtlRequest.log = log;
+  }
 
   private Properties getConnectionProperties() {
     Properties props = new Properties();
@@ -48,6 +54,8 @@ public class EtlRequest implements CamusRequest {
   }
 
   public EtlRequest() {
+    if (log == null)
+      log = Logger.getLogger(getClass());
   }
 
   public EtlRequest(JobContext context, String topic, int partition) {
@@ -55,6 +63,9 @@ public class EtlRequest implements CamusRequest {
     this.topic = topic;
     this.partition = partition;
     setOffset(offset);
+
+    if (log == null)
+      log = Logger.getLogger(getClass());
   }
 
   public EtlRequest(JobContext context, String topic, int partition, String brokers) {
@@ -64,6 +75,9 @@ public class EtlRequest implements CamusRequest {
     this.partition = partition;
 
     setOffset(offset);
+
+    if (log == null)
+      log = Logger.getLogger(getClass());
   }
 
   public EtlRequest(JobContext context, String topic, int partition, String brokers, long offset) {
@@ -72,6 +86,9 @@ public class EtlRequest implements CamusRequest {
     this.brokers = brokers;
     this.partition = partition;
     setOffset(offset);
+
+    if (log == null)
+      log = Logger.getLogger(getClass());
   }
 
   @Override
@@ -187,6 +204,7 @@ public class EtlRequest implements CamusRequest {
 
   @Override
   public void write(DataOutput out) throws IOException {
+    log.info("EtlRequest to be written: " + this);
     Text.writeString(out, topic);
     if (this.brokers != null)
       Text.writeString(out, this.brokers.toString());
@@ -195,6 +213,20 @@ public class EtlRequest implements CamusRequest {
     out.writeInt(partition);
     out.writeLong(offset);
     out.writeLong(latestOffset);
+  }
+
+  @Override
+  public String toString() {
+    return "EtlRequest{" +
+        "context=" + context +
+        ", topic='" + topic + '\'' +
+        ", partition=" + partition +
+        ", brokers='" + brokers + '\'' +
+        ", offset=" + offset +
+        ", latestOffset=" + latestOffset +
+        ", earliestOffset=" + earliestOffset +
+        ", avgMsgSize=" + avgMsgSize +
+        '}';
   }
 
   @Override
@@ -207,6 +239,8 @@ public class EtlRequest implements CamusRequest {
     partition = in.readInt();
     offset = in.readLong();
     latestOffset = in.readLong();
+
+    log.info("Loaded EtlRequest: " + this);
   }
 
   /**
