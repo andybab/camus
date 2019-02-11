@@ -8,6 +8,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.utils.Crc32;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
@@ -105,15 +106,15 @@ public class KafkaReader {
     currentOffset = consumerRecord.offset() + 1; // increase offset
     currentCount++; // increase count
 
-    Message readMessage;
+    long checksum = 0;
     if (key == null){
-      readMessage = new Message(payload);
+      checksum = Crc32.crc32(payload);
     } else {
-      readMessage = new Message(payload, key, Message.NoTimestamp(), Message.CurrentMagicValue());
+      checksum = Crc32.crc32(payload) ^ Crc32.crc32(key);
     }
 
     return new KafkaMessage(payload, key, kafkaRequest.getTopic(), kafkaRequest.getPartition(),
-            consumerRecord.offset(), readMessage.checksum());
+            consumerRecord.offset(), checksum);
   }
 
   public boolean fetch() throws IOException {
