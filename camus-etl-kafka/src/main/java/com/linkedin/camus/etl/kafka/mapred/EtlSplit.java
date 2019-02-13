@@ -6,10 +6,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.linkedin.camus.etl.kafka.common.EtlRequest;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.InputSplit;
 
+import com.linkedin.camus.etl.kafka.common.EtlRequest;
 import com.linkedin.camus.workallocater.CamusRequest;
 
 
@@ -37,7 +37,7 @@ public class EtlSplit extends InputSplit implements Writable {
   }
 
   @Override
-  public long getLength() throws IOException {
+  public long getLength() {
     return length;
   }
 
@@ -46,7 +46,7 @@ public class EtlSplit extends InputSplit implements Writable {
   }
 
   @Override
-  public String[] getLocations() throws IOException {
+  public String[] getLocations() {
     return new String[] {};
   }
 

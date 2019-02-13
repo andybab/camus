@@ -63,6 +63,7 @@ public class EtlRequest implements CamusRequest {
     this.topic = topic;
     this.partition = partition;
     setOffset(offset);
+    this.brokers = CamusJob.getKafkaBrokers(context);
 
     if (log == null)
       log = Logger.getLogger(getClass());
@@ -78,6 +79,8 @@ public class EtlRequest implements CamusRequest {
 
     if (log == null)
       log = Logger.getLogger(getClass());
+
+    log.info(this);
   }
 
   public EtlRequest(JobContext context, String topic, int partition, String brokers, long offset) {
@@ -89,10 +92,15 @@ public class EtlRequest implements CamusRequest {
 
     if (log == null)
       log = Logger.getLogger(getClass());
+
+    log.info(this);
   }
 
   @Override
   public long getLastOffset(long time) {
+    if (this.latestOffset != -1)
+      return this.latestOffset;
+
     Properties props = getConnectionProperties();
 
     TopicPartition topicPartition = this.getTopicPartition();
@@ -177,20 +185,20 @@ public class EtlRequest implements CamusRequest {
 
   @Override
   public long getEarliestOffset() {
-    if (this.earliestOffset == -2 && this.brokers != null) {
-      Properties props = getConnectionProperties();
-
-      TopicPartition topicPartition = this.getTopicPartition();
-      KafkaConsumer<byte[], byte[]> kafkaConsumer = new KafkaConsumer<byte[], byte[]>(props);
-      Map<TopicPartition, Long> topicPartitions = kafkaConsumer.beginningOffsets(Collections.singletonList(topicPartition));
-
-      long earliestOffset = topicPartitions.get(topicPartition);
-
-      kafkaConsumer.close();
-
-      return earliestOffset;
+    if (this.earliestOffset != -2 || this.brokers == null) {
+      return this.earliestOffset;
     }
-    return this.earliestOffset;
+    Properties props = getConnectionProperties();
+
+    TopicPartition topicPartition = this.getTopicPartition();
+    KafkaConsumer<byte[], byte[]> kafkaConsumer = new KafkaConsumer<byte[], byte[]>(props);
+    Map<TopicPartition, Long> topicPartitions = kafkaConsumer.beginningOffsets(Collections.singletonList(topicPartition));
+
+    long earliestOffset = topicPartitions.get(topicPartition);
+
+    kafkaConsumer.close();
+
+    return earliestOffset;
   }
 
   @Override
@@ -218,8 +226,7 @@ public class EtlRequest implements CamusRequest {
   @Override
   public String toString() {
     return "EtlRequest{" +
-        "context=" + context +
-        ", topic='" + topic + '\'' +
+        "topic='" + topic + '\'' +
         ", partition=" + partition +
         ", brokers='" + brokers + '\'' +
         ", offset=" + offset +
@@ -234,8 +241,8 @@ public class EtlRequest implements CamusRequest {
     topic = Text.readString(in);
     String brokersStr = Text.readString(in);
 
-    if (!brokersStr.isEmpty())
-      this.brokers = brokersStr;
+    /*if (!brokersStr.isEmpty()) //We always use broker string from configuration
+      this.brokers = brokersStr;*/
     partition = in.readInt();
     offset = in.readLong();
     latestOffset = in.readLong();

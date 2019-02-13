@@ -300,7 +300,6 @@ public class CamusJob extends Configured implements Tool {
     // removing failed exectutions if we need room
     if (limit < currentCount) {
       FileStatus[] failedExecutions = fs.listStatus(execBasePath, new PathFilter() {
-
         public boolean accept(Path path) {
           try {
             dateFmt.parseDateTime(path.getName());

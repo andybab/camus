@@ -190,7 +190,7 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
       //TODO: factor out kafka specific request functionality
       CamusRequest etlRequest =
               new EtlRequest(context, topicAndPartition.getKey().topic(),
-                      topicAndPartition.getKey().partition(), CamusJob.getKafkaBrokers(context));
+                      topicAndPartition.getKey().partition(), CamusJob.getKafkaBrokers(context), topicAndPartition.getValue().beginningOffset);
       finalRequests.add(etlRequest);
     }
 
@@ -244,6 +244,7 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
       throw new IOException("Unable to pull requests from Kafka brokers.", e);
     }
 
+
     Collections.sort(finalRequests, new Comparator<CamusRequest>() {
       @Override
       public int compare(CamusRequest r1, CamusRequest r2) {
@@ -252,14 +253,17 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
     });
 
     writeRequests(finalRequests, context);
-    Map<CamusRequest, EtlKey> offsetKeys = getPreviousOffsets(FileInputFormat.getInputPaths(context), context);
+    Map<TopicPartition, EtlKey> offsetKeys = getPreviousOffsets(FileInputFormat.getInputPaths(context), context);
+    log.info(offsetKeys);
     Set<String> moveLatest = getMoveToLatestTopicsSet(context);
     String camusRequestEmailMessage = "";
     for (CamusRequest request : finalRequests) {
+      TopicPartition topicPartition = new TopicPartition(request.getTopic(), request.getPartition());
       if (moveLatest.contains(request.getTopic()) || moveLatest.contains("all")) {
         log.info("Moving to latest for topic: " + request.getTopic());
         //TODO: factor out kafka specific request functionality
-        EtlKey oldKey = offsetKeys.get(request);
+
+        EtlKey oldKey = offsetKeys.get(topicPartition);
         EtlKey newKey =
             new EtlKey(request.getTopic(), request.getPartition(), 0,
                 request.getLastOffset());
@@ -267,11 +271,13 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
         if (oldKey != null)
           newKey.setMessageSize(oldKey.getMessageSize());
 
-        offsetKeys.put(request, newKey);
+        offsetKeys.put(topicPartition, newKey);
       }
 
-      EtlKey key = offsetKeys.get(request);
-
+      EtlKey key = offsetKeys.get(topicPartition);
+      log.info(request);
+      log.info(offsetKeys);
+      log.info("--> Loaded offset keys: " + key);
       if (key != null) {
         request.setOffset(key.getOffset());
         request.setAvgMsgSize(key.getMessageSize());
@@ -292,7 +298,7 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
           log.error("Moving to the earliest offset available");
           request.setOffset(request.getEarliestOffset());
           offsetKeys.put(
-              request,
+              topicPartition,
               //TODO: factor out kafka specific request functionality
               new EtlKey(request.getTopic(), request.getPartition(), 0, request
                   .getOffset()));
@@ -390,8 +396,8 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
     writer.close();
   }
 
-  private Map<CamusRequest, EtlKey> getPreviousOffsets(Path[] inputs, JobContext context) throws IOException {
-    Map<CamusRequest, EtlKey> offsetKeysMap = new HashMap<CamusRequest, EtlKey>();
+  private Map<TopicPartition, EtlKey> getPreviousOffsets(Path[] inputs, JobContext context) throws IOException {
+    Map<TopicPartition, EtlKey> offsetKeysMap = new HashMap<TopicPartition, EtlKey>();
     for (Path input : inputs) {
       FileSystem fs = input.getFileSystem(context.getConfiguration());
       for (FileStatus f : fs.listStatus(input, new OffsetFileFilter())) {
@@ -400,7 +406,8 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
         EtlKey key = new EtlKey();
         while (reader.next(key, NullWritable.get())) {
           //TODO: factor out kafka specific request functionality
-          CamusRequest request = new EtlRequest(context, key.getTopic(), key.getPartition(), CamusJob.getKafkaBrokers(context));
+          TopicPartition request = new TopicPartition(key.getTopic(), key.getPartition());
+          log.info("--> in getPreviousOffsets " + f.getPath() + " EtlRequest: " + request);
           if (offsetKeysMap.containsKey(request)) {
 
             EtlKey oldKey = offsetKeysMap.get(request);
